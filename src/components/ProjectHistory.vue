@@ -1,10 +1,10 @@
 <template>
   <div class="history-container">
-    <h1>历史项目</h1>
+    <h1>Project History</h1>
     
     <div class="controls-bar">
       <div class="search-box">
-        <input type="text" placeholder="搜索项目..." v-model="searchQuery" />
+        <input type="text" placeholder="Search projects..." v-model="searchQuery" />
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon">
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
@@ -13,17 +13,17 @@
       
       <div class="filters">
         <select v-model="filterStatus">
-          <option value="all">所有状态</option>
-          <option value="completed">已完成</option>
-          <option value="processing">处理中</option>
-          <option value="failed">失败</option>
+          <option value="all">All Statuses</option>
+          <option value="completed">Completed</option>
+          <option value="processing">Processing</option>
+          <option value="failed">Failed</option>
         </select>
         
         <select v-model="sortBy">
-          <option value="date-desc">最新优先</option>
-          <option value="date-asc">最早优先</option>
-          <option value="name-asc">名称 A-Z</option>
-          <option value="name-desc">名称 Z-A</option>
+          <option value="date-desc">Newest First</option>
+          <option value="date-asc">Oldest First</option>
+          <option value="name-asc">Name A-Z</option>
+          <option value="name-desc">Name Z-A</option>
         </select>
       </div>
     </div>
@@ -31,7 +31,7 @@
     <div class="projects-grid">
       <div v-for="project in filteredProjects" :key="project.id" class="project-card">
         <div class="project-thumbnail">
-          <img :src="project.thumbnail" alt="项目缩略图" />
+          <img :src="project.thumbnail" alt="Project thumbnail" />
           <div class="project-status" :class="project.status">
             {{ getStatusText(project.status) }}
           </div>
@@ -43,19 +43,19 @@
           <div class="project-stats">
             <div class="stat">
               <span class="stat-value">{{ project.buildingCount }}</span>
-              <span class="stat-label">建筑物</span>
+              <span class="stat-label">Buildings</span>
             </div>
             <div class="stat">
               <span class="stat-value">{{ project.area }}</span>
-              <span class="stat-label">平方米</span>
+              <span class="stat-label">m²</span>
             </div>
           </div>
         </div>
         
         <div class="project-actions">
-          <button class="action-btn view-btn" @click="viewProject(project.id)">查看</button>
-          <button class="action-btn export-btn" @click="exportProject(project.id)">导出</button>
-          <button class="action-btn delete-btn" @click="confirmDelete(project.id)">删除</button>
+          <button class="action-btn view-btn" @click="viewProject(project.id)">View</button>
+          <button class="action-btn export-btn" @click="exportProject(project.id)">Export</button>
+          <button class="action-btn delete-btn" @click="confirmDelete(project.id)">Delete</button>
         </div>
       </div>
       
@@ -65,21 +65,21 @@
             <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
             <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path>
           </svg>
-          <h3>没有找到匹配的项目</h3>
-          <p>尝试调整筛选条件或创建新项目</p>
-          <button class="new-project-btn" @click="$router.push('/extract')">创建新项目</button>
+          <h3>No matching projects found</h3>
+          <p>Try adjusting your filters or create a new project</p>
+          <button class="btn" @click="$router.push('/extract')">Create New Project</button>
         </div>
       </div>
     </div>
     
-    <!-- 删除确认对话框 -->
+    <!-- Delete confirmation dialog -->
     <div class="delete-modal" v-if="showDeleteModal">
       <div class="modal-content">
-        <h3>确认删除</h3>
-        <p>您确定要删除这个项目吗？此操作无法撤销。</p>
+        <h3>Confirm Deletion</h3>
+        <p>Are you sure you want to delete this project? This action cannot be undone.</p>
         <div class="modal-actions">
-          <button class="cancel-btn" @click="showDeleteModal = false">取消</button>
-          <button class="confirm-btn" @click="deleteProject">删除</button>
+          <button class="cancel-btn" @click="showDeleteModal = false">Cancel</button>
+          <button class="confirm-btn" @click="deleteProject">Delete</button>
         </div>
       </div>
     </div>
@@ -99,7 +99,7 @@ export default {
       projects: [
         {
           id: 1,
-          name: '北京市CBD区域建筑物提取',
+          name: 'Beijing CBD Building Extraction',
           date: new Date(2023, 6, 15),
           thumbnail: 'https://images.unsplash.com/photo-1545642419-d0e61a866ab1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8c2F0ZWxsaXRlJTIwaW1hZ2V8ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&w=500&q=60',
           status: 'completed',
@@ -108,7 +108,7 @@ export default {
         },
         {
           id: 2,
-          name: '上海浦东新区分析',
+          name: 'Shanghai Pudong Analysis',
           date: new Date(2023, 7, 3),
           thumbnail: 'https://images.unsplash.com/photo-1614642264762-d0a3b8bf3700?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8c2F0ZWxsaXRlJTIwaW1hZ2V8ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&w=500&q=60',
           status: 'processing',
@@ -117,7 +117,7 @@ export default {
         },
         {
           id: 3,
-          name: '广州天河区建筑提取',
+          name: 'Guangzhou Tianhe Building Extraction',
           date: new Date(2023, 5, 22),
           thumbnail: 'https://images.unsplash.com/photo-1576719561108-7023141c67e3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NXx8c2F0ZWxsaXRlJTIwaW1hZ2V8ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&w=500&q=60',
           status: 'completed',
@@ -126,7 +126,7 @@ export default {
         },
         {
           id: 4,
-          name: '深圳南山区分析',
+          name: 'Shenzhen Nanshan Analysis',
           date: new Date(2023, 7, 8),
           thumbnail: 'https://images.unsplash.com/photo-1622542796254-5b9c46a804a8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OHx8c2F0ZWxsaXRlJTIwaW1hZ2V8ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&w=500&q=60',
           status: 'failed',
@@ -135,7 +135,7 @@ export default {
         },
         {
           id: 5,
-          name: '杭州西湖区建筑物密度分析',
+          name: 'Hangzhou West Lake Building Density Analysis',
           date: new Date(2023, 6, 29),
           thumbnail: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OXx8c2F0ZWxsaXRlJTIwaW1hZ2V8ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&w=500&q=60',
           status: 'completed',
@@ -220,12 +220,17 @@ export default {
   max-width: 1200px;
   margin: 0 auto;
   padding: 40px 20px;
+  background-color: #f9f9fb;
+  min-height: calc(100vh - 70px);
 }
 
 h1 {
-  color: #0d0c22;
+  color: #000;
   margin-bottom: 40px;
   text-align: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
 }
 
 .controls-bar {
@@ -244,9 +249,10 @@ h1 {
 .search-box input {
   width: 100%;
   padding: 12px 40px 12px 16px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid #e8e8e8;
   border-radius: 8px;
   font-size: 14px;
+  background-color: white;
 }
 
 .search-icon {
@@ -254,7 +260,7 @@ h1 {
   right: 12px;
   top: 50%;
   transform: translateY(-50%);
-  color: #6e6d7a;
+  color: #666;
 }
 
 .filters {
@@ -264,11 +270,11 @@ h1 {
 
 .filters select {
   padding: 10px 16px;
-  border: 1px solid #e0e0e0;
+  border: 1px solid #e8e8e8;
   border-radius: 8px;
   background-color: white;
   font-size: 14px;
-  color: #0d0c22;
+  color: #000;
 }
 
 .projects-grid {
@@ -281,13 +287,13 @@ h1 {
   background: white;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .project-card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.07);
 }
 
 .project-thumbnail {
@@ -313,39 +319,40 @@ h1 {
 }
 
 .project-status.completed {
-  background-color: #d1fad7;
-  color: #2a9d8f;
+  background-color: #eef9f2;
+  color: #227855;
 }
 
 .project-status.processing {
-  background-color: #d1e3fa;
-  color: #3a86ff;
+  background-color: #eef4ff;
+  color: #3a5cc9;
 }
 
 .project-status.failed {
-  background-color: #fad1d1;
-  color: #e63946;
+  background-color: #fcf1ee;
+  color: #cc3a2f;
 }
 
 .project-info {
-  padding: 16px;
+  padding: 20px;
 }
 
 .project-info h3 {
   margin: 0 0 8px;
   font-size: 18px;
-  color: #0d0c22;
+  color: #000;
+  font-weight: 600;
 }
 
 .project-date {
-  color: #6e6d7a;
+  color: #666;
   font-size: 14px;
   margin-bottom: 16px;
 }
 
 .project-stats {
   display: flex;
-  gap: 16px;
+  gap: 24px;
 }
 
 .stat {
@@ -355,34 +362,34 @@ h1 {
 
 .stat-value {
   font-weight: 600;
-  color: #ea4c89;
+  color: #000;
 }
 
 .stat-label {
   font-size: 12px;
-  color: #6e6d7a;
+  color: #666;
 }
 
 .project-actions {
   display: flex;
-  padding: 0 16px 16px;
-  gap: 8px;
+  padding: 0 20px 20px;
+  gap: 10px;
 }
 
 .action-btn {
   flex: 1;
-  padding: 8px;
+  padding: 10px;
   border: none;
   border-radius: 6px;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
 }
 
 .view-btn {
-  background-color: #f4f4f4;
-  color: #0d0c22;
+  background-color: #f5f5f5;
+  color: #000;
 }
 
 .view-btn:hover {
@@ -390,21 +397,21 @@ h1 {
 }
 
 .export-btn {
-  background-color: #d1fad7;
-  color: #2a9d8f;
+  background-color: #eef9f2;
+  color: #227855;
 }
 
 .export-btn:hover {
-  background-color: #c0f0c6;
+  background-color: #ddf1e6;
 }
 
 .delete-btn {
-  background-color: #fad1d1;
-  color: #e63946;
+  background-color: #fcf1ee;
+  color: #cc3a2f;
 }
 
 .delete-btn:hover {
-  background-color: #f5c0c0;
+  background-color: #f9e3de;
 }
 
 .no-projects {
@@ -419,33 +426,34 @@ h1 {
 }
 
 .empty-state svg {
-  color: #e0e0e0;
-  margin-bottom: 16px;
+  color: #ddd;
+  margin-bottom: 20px;
 }
 
 .empty-state h3 {
-  color: #0d0c22;
+  color: #000;
   margin-bottom: 8px;
+  font-weight: 600;
 }
 
 .empty-state p {
-  color: #6e6d7a;
+  color: #666;
   margin-bottom: 24px;
 }
 
-.new-project-btn {
-  background-color: #ea4c89;
+.btn {
+  background-color: #000;
   color: white;
   border: none;
   padding: 12px 24px;
   border-radius: 8px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
 }
 
-.new-project-btn:hover {
-  background-color: #df3e7b;
+.btn:hover {
+  background-color: #333;
 }
 
 .delete-modal {
@@ -464,7 +472,7 @@ h1 {
 .modal-content {
   background: white;
   border-radius: 12px;
-  padding: 24px;
+  padding: 30px;
   width: 100%;
   max-width: 400px;
 }
@@ -472,35 +480,46 @@ h1 {
 .modal-content h3 {
   margin-top: 0;
   margin-bottom: 12px;
+  color: #000;
+  font-weight: 600;
 }
 
 .modal-content p {
   margin-bottom: 24px;
-  color: #6e6d7a;
+  color: #666;
 }
 
 .modal-actions {
   display: flex;
-  gap: 12px;
+  gap: 16px;
 }
 
 .cancel-btn, .confirm-btn {
   flex: 1;
-  padding: 10px;
+  padding: 12px;
   border-radius: 8px;
   font-weight: 500;
   cursor: pointer;
   border: none;
+  transition: all 0.2s;
 }
 
 .cancel-btn {
-  background-color: #f4f4f4;
-  color: #0d0c22;
+  background-color: #f5f5f5;
+  color: #000;
+}
+
+.cancel-btn:hover {
+  background-color: #e9e9e9;
 }
 
 .confirm-btn {
-  background-color: #ea4c89;
+  background-color: #000;
   color: white;
+}
+
+.confirm-btn:hover {
+  background-color: #333;
 }
 
 @media (max-width: 768px) {

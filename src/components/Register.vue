@@ -1,7 +1,7 @@
 <template>
-  <div class="login-container">
-    <div class="login-card">
-      <h1>Sign in to your account</h1>
+  <div class="register-container">
+    <div class="register-card">
+      <h1>Create an account</h1>
       
       <!-- 成功提示框 -->
       <div class="success-message" v-if="successMessage">{{ successMessage }}</div>
@@ -9,7 +9,7 @@
       <!-- 错误提示框 -->
       <div class="error-message" v-if="error">{{ error }}</div>
       
-      <form @submit.prevent="handleLogin">
+      <form @submit.prevent="handleRegister">
         <div class="form-group">
           <label for="username">Username or Email</label>
           <input 
@@ -28,77 +28,79 @@
             required
           />
         </div>
-        <div class="remember-forgot">
-          <div class="remember-me">
-            <input type="checkbox" id="remember" v-model="rememberMe">
-            <label for="remember">Remember me</label>
-          </div>
-          <a href="#" class="forgot-password">Forgot password?</a>
+        <div class="form-group">
+          <label for="confirm-password">Confirm Password</label>
+          <input 
+            type="password" 
+            id="confirm-password" 
+            v-model="confirmPassword" 
+            required
+          />
         </div>
         <button type="submit" class="btn" :disabled="loading">
-          {{ loading ? 'Signing in...' : 'Sign In' }}
+          {{ loading ? 'Creating account...' : 'Sign Up' }}
         </button>
       </form>
   
-      <!-- 添加注册链接 -->
-      <div class="signup-link">
-        Don't have an account? <router-link to="/register">Sign up</router-link>
+      <!-- 添加登录链接 -->
+      <div class="login-link">
+        Already have an account? <router-link to="/login">Log in</router-link>
       </div>
     </div>
   </div>
 </template>
-
+  
 <script>
 import api from '../services/api.js';
-
+  
 export default {
-  name: 'LoginComponent',
+  name: 'RegisterComponent',
   data() {
     return {
       username: '',
       password: '',
-      rememberMe: false,
+      confirmPassword: '',
       loading: false,
       error: null,
       successMessage: null
     }
   },
   methods: {
-    async handleLogin() {
+    async handleRegister() {
       try {
+        // 验证密码是否匹配
+        if (this.password !== this.confirmPassword) {
+          this.error = "Passwords don't match";
+          return;
+        }
+        
         this.loading = true;
         this.error = null;
         this.successMessage = null;
         
         // 调用后端API
-        const response = await api.post('/login', {
+        const response = await api.post('/register', {
           username: this.username,
           password: this.password
         });
         
         // 检查响应状态 - 使用code字段
         if (response.code === 0) {
-          // 登录成功，显示成功消息
-          this.successMessage = 'Login successful. Redirecting...';
-          
-          // 登录成功，设置认证状态
-          localStorage.setItem('isAuthenticated', 'true');
-          
-          // 通知其他组件登录状态变化
-          window.dispatchEvent(new Event('storage'));
+          // 注册成功，显示成功消息
+          this.successMessage = 'Account created successfully. Redirecting to login...';
           
           // 延迟跳转，让用户看到成功消息
           setTimeout(() => {
-            // 登录成功后跳转到首页
-            this.$router.push('/home');
-          }, 1000);
+            // 注册成功后跳转到登录页
+            this.$router.push('/login');
+          }, 1500);
         } else {
           // 如果后端返回的code不是0
-          this.error = response.data.err || 'Login failed';
+          this.error = response.data.err || 'Registration failed';
         }
       } catch (err) {
-        this.error = err.response?.data?.message || 'Incorrect username or password. Please try again later.';
-        console.error('Login error:', err);
+        this.error = err.response?.data?.message || 'Registration failed. Please try again later.';
+        console.error('Registration error:', err);
       } finally {
         this.loading = false;
       }
@@ -106,9 +108,9 @@ export default {
   }
 }
 </script>
-
+  
 <style scoped>
-.login-container {
+.register-container {
   width: 100%;
   min-height: calc(100vh - 70px);
   display: flex;
@@ -118,7 +120,7 @@ export default {
   padding: 40px 20px;
 }
 
-.login-card {
+.register-card {
   background: white;
   border-radius: 12px;
   padding: 40px;
@@ -148,8 +150,7 @@ label {
   color: #555;
 }
 
-input[type="text"],
-input[type="password"] {
+input {
   width: 100%;
   padding: 12px 16px;
   border: 1px solid #e8e8e8;
@@ -165,34 +166,6 @@ input:focus {
   box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1);
 }
 
-.remember-forgot {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 20px;
-  font-size: 14px;
-}
-
-.remember-me {
-  display: flex;
-  align-items: center;
-}
-
-.remember-me input {
-  margin-right: 8px;
-}
-
-.forgot-password {
-  color: #000;
-  text-decoration: none;
-  transition: color 0.2s;
-}
-
-.forgot-password:hover {
-  color: #333;
-  text-decoration: underline;
-}
-
 .btn {
   width: 100%;
   padding: 12px;
@@ -204,6 +177,7 @@ input:focus {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+  margin-top: 8px;
 }
 
 .btn:hover:not(:disabled) {
@@ -236,21 +210,21 @@ input:focus {
   font-size: 14px;
 }
 
-.signup-link {
+.login-link {
   text-align: center;
   margin-top: 24px;
   font-size: 14px;
   color: #555;
 }
 
-.signup-link a {
+.login-link a {
   color: #000;
   font-weight: 500;
   text-decoration: none;
   transition: color 0.2s;
 }
 
-.signup-link a:hover {
+.login-link a:hover {
   color: #333;
   text-decoration: underline;
 }

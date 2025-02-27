@@ -1,21 +1,21 @@
 <template>
   <div class="home-container">
-    <h1>欢迎来到建筑物提取系统</h1>
-    
-    <div class="dashboard">
-      <div class="info-card">
-        <h2>开始新项目</h2>
-        <p>上传遥感图像并开始提取建筑物。</p>
-        <button class="action-button" @click="$router.push('/extract')">上传图像</button>
+    <div class="home-content">
+      <h1>Welcome to Uncerscape</h1>
+      
+      <div class="dashboard">
+        <div class="info-card">
+          <h2>Start a new project</h2>
+          <p>Upload your target image and start building extraction.</p>
+          <button class="btn" @click="$router.push('/extract')">Upload</button>
+        </div>
+        
+        <div class="info-card">
+          <h2>Project History</h2>
+          <p>Check your previous building extraction projects.</p>
+          <button class="btn-secondary" @click="$router.push('/history')">Review</button>
+        </div>
       </div>
-      
-      <div class="info-card">
-        <h2>历史项目</h2>
-        <p>查看您之前的建筑物提取项目。</p>
-        <button class="action-button" @click="$router.push('/history')">查看历史</button>
-      </div>
-      
-      
     </div>
   </div>
 </template>
@@ -28,55 +28,100 @@ export default {
 
 <style scoped>
 .home-container {
-  padding: 40px;
+  width: 100%;
+  min-height: calc(100vh - 70px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: #f9f9fb;
+  padding: 40px 20px;
+}
+
+.home-content {
   max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 h1 {
-  color: #0d0c22;
+  color: #000;
   margin-bottom: 40px;
   text-align: center;
+  font-size: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.5px;
 }
 
 .dashboard {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 24px;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 30px;
 }
 
 .info-card {
   background: white;
   border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
+  padding: 32px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .info-card h2 {
-  color: #0d0c22;
+  color: #000;
   margin-bottom: 16px;
-  font-size: 20px;
+  font-size: 22px;
+  font-weight: 600;
 }
 
 .info-card p {
-  color: #6e6d7a;
-  margin-bottom: 24px;
-  line-height: 1.5;
+  color: #555;
+  margin-bottom: 32px;
+  line-height: 1.6;
+  flex-grow: 1;
 }
 
-.action-button {
-  background-color: #45a049;
+.btn {
+  display: inline-block;
+  padding: 12px 28px;
+  background-color: #000;
   color: white;
   border: none;
-  padding: 12px 24px;
   border-radius: 8px;
+  font-size: 16px;
   font-weight: 500;
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: all 0.2s;
+  text-decoration: none;
 }
 
-.action-button:hover {
-  background-color: #45a049;
+.btn:hover {
+  background-color: #333;
+  transform: translateY(-1px);
+}
+
+.btn-secondary {
+  display: inline-block;
+  padding: 12px 28px;
+  background-color: transparent;
+  color: #000;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-decoration: none;
+}
+
+.btn-secondary:hover {
+  background-color: rgba(0,0,0,0.05);
+}
+
+@media (max-width: 768px) {
+  .dashboard {
+    grid-template-columns: 1fr;
+  }
 }
 </style> 
