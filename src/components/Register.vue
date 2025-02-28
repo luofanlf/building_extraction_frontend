@@ -78,10 +78,11 @@ export default {
         this.error = null;
         this.successMessage = null;
         
-        // 调用后端API
+        // 调用后端API，添加confirm_password字段
         const response = await api.post('/register', {
           username: this.username,
-          password: this.password
+          password: this.password,
+          confirm_password: this.confirmPassword
         });
         
         // 检查响应状态 - 使用code字段
@@ -95,11 +96,16 @@ export default {
             this.$router.push('/login');
           }, 1500);
         } else {
-          // 如果后端返回的code不是0
-          this.error = response.data.err || 'Registration failed';
+          // 从response中获取err字段显示错误信息
+          this.error = response.err || 'Registration failed';
         }
       } catch (err) {
-        this.error = err.response?.data?.message || 'Registration failed. Please try again later.';
+        // 处理网络错误或后端返回的非正常响应
+        if (err.response && err.response.data) {
+          this.error = err.response.data.err || err.response.data.message || 'Registration failed';
+        } else {
+          this.error = 'Registration failed. Please try again later.';
+        }
         console.error('Registration error:', err);
       } finally {
         this.loading = false;

@@ -12,7 +12,6 @@ const api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   config => {
-    // 可以在这里添加认证信息，如token
     const token = localStorage.getItem('token');
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
@@ -24,18 +23,35 @@ api.interceptors.request.use(
   }
 );
 
-// 响应拦截器
+// 响应拦截器 - 处理常见错误
 api.interceptors.response.use(
   response => {
+    // 直接返回响应数据
     return response.data;
   },
   error => {
+    // 处理401未授权错误
     if (error.response && error.response.status === 401) {
-      // 处理未授权错误，如重定向到登录页
-      window.location.href = '/login';
+      // 清除token和认证状态
+      localStorage.removeItem('token');
+      localStorage.removeItem('isAuthenticated');
+      
+      // 如果不在登录页面，则跳转到登录页面
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
+    
     return Promise.reject(error);
   }
 );
+
+// 登出功能
+api.logout = function() {
+  localStorage.removeItem('token');
+  localStorage.removeItem('isAuthenticated');
+  window.dispatchEvent(new Event('storage'));
+  window.location.href = '/login';
+};
 
 export default api; 

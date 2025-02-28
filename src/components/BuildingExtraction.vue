@@ -21,15 +21,14 @@
       <div class="preview-container">
         <h2>Image Preview</h2>
         <img :src="imagePreview" alt="Preview" class="preview-image" />
+        <div class="upload-progress" v-if="isUploading">
+          <div class="progress-bar" :style="{ width: uploadProgress + '%' }"></div>
+          <span class="progress-text">Uploading... {{ uploadProgress }}%</span>
+        </div>
       </div>
       
       <div class="extraction-controls">
         <h2>Extraction Parameters</h2>
-        <div class="control-group">
-          <label for="threshold">Detection Threshold:</label>
-          <input type="range" id="threshold" min="0" max="100" v-model="threshold" />
-          <span>{{ threshold }}%</span>
-        </div>
         
         <div class="control-group">
           <label for="algorithm">Algorithm Selection:</label>
@@ -40,46 +39,64 @@
           </select>
         </div>
         
-        <button class="btn" @click="startExtraction">Start Extraction</button>
+        <button class="btn" @click="startExtraction" :disabled="isProcessing || isUploading || !imageUploaded">
+          {{ isProcessing ? 'Processing...' : 'Start Extraction' }}
+        </button>
+        
+        <div class="error-message" v-if="errorMessage">{{ errorMessage }}</div>
       </div>
     </div>
     
     <div class="result-section" v-if="showResults">
       <h2>Extraction Results</h2>
       <div class="result-image-container">
-        <img src="" alt="Extraction Result" class="result-image" />
+        <img :src="resultImage" alt="Extraction Result" class="result-image" />
       </div>
       <div class="result-stats">
         <div class="stat-item">
           <h3>Buildings Detected</h3>
-          <p>42</p>
+          <p>{{ extractionStats.buildingsCount || 0 }}</p>
         </div>
         <div class="stat-item">
           <h3>Total Area</h3>
-          <p>12,450 m²</p>
+          <p>{{ extractionStats.totalArea || 0 }} m²</p>
         </div>
         <div class="stat-item">
           <h3>Average Building Size</h3>
-          <p>296.4 m²</p>
+          <p>{{ extractionStats.averageSize || 0 }} m²</p>
         </div>
       </div>
       <div class="action-buttons">
-        <button class="btn">Export Results</button>
-        <button class="btn-secondary">Save Project</button>
+        <button class="btn" @click="exportResults">Export Results</button>
+        <button class="btn-secondary" @click="saveProject">Save Project</button>
       </div>
     </div>
   </div>
 </template>
 
 <script>
+import api from '../services/api.js';
+
 export default {
   name: 'BuildingExtraction',
   data() {
     return {
       imagePreview: '',
-      threshold: 50,
       selectedAlgorithm: 'unet',
-      showResults: false
+      showResults: false,
+      isProcessing: false,
+      isUploading: false,
+      uploadProgress: 0,
+      imageUploaded: false,
+      errorMessage: null,
+      resultImage: '',
+      extractionStats: {
+        buildingsCount: 0,
+        totalArea: 0,
+        averageSize: 0
+      },
+      originalImage: null, // Store original image data
+      uploadedImagePath: '' // Store uploaded image path
     }
   },
   methods: {
@@ -99,20 +116,126 @@ export default {
       }
     },
     processImage(file) {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        this.imagePreview = e.target.result
+      // Validate file type
+      if (!file.type.match('image.*')) {
+        this.errorMessage = 'Please upload an image file';
+        return;
       }
-      reader.readAsDataURL(file)
-    },
-    startExtraction() {
-      // 这里应该是调用API进行实际的建筑物提取
-      console.log('开始提取建筑物，使用算法:', this.selectedAlgorithm, '阈值:', this.threshold)
       
-      // 模拟处理时间
-      setTimeout(() => {
-        this.showResults = true
-      }, 2000)
+      // Validate file size (limit to 20MB)
+      if (file.size > 20 * 1024 * 1024) {
+        this.errorMessage = 'Image size cannot exceed 20MB';
+        return;
+      }
+      
+      // Save original image data
+      this.originalImage = file;
+      
+      // Create preview
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        this.imagePreview = e.target.result;
+      }
+      reader.readAsDataURL(file);
+      
+      // Reset state
+      this.errorMessage = null;
+      this.imageUploaded = false;
+      this.uploadedImagePath = '';
+      
+      // Automatically upload image to server
+      this.uploadImage(file);
+    },
+    async uploadImage(file) {
+      try {
+        this.isUploading = true;
+        this.uploadProgress = 0;
+        
+        // Create FormData object
+        const formData = new FormData();
+        formData.append('image', file);
+        
+        // Send POST request to upload image
+        const response = await api.post('/upload', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          },
+          onUploadProgress: (progressEvent) => {
+            // Calculate and update upload progress
+            this.uploadProgress = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+          }
+        });
+        
+        // Handle response
+        if (response && response.code === 0 && response.data) {
+          // Save uploaded image path
+          this.uploadedImagePath = response.data.imagePath;
+          this.imageUploaded = true;
+          console.log('Image uploaded successfully, path:', this.uploadedImagePath);
+        } else {
+          throw new Error(response?.message || 'Failed to upload image');
+        }
+      } catch (error) {
+        console.error('Error uploading image:', error);
+        this.errorMessage = error.message || 'Failed to upload image. Please try again.';
+      } finally {
+        this.isUploading = false;
+      }
+    },
+    async startExtraction() {
+      if (!this.imageUploaded || !this.uploadedImagePath) {
+        this.errorMessage = 'Please upload an image first';
+        return;
+      }
+      
+      try {
+        this.isProcessing = true;
+        this.errorMessage = null;
+        this.showResults = false;
+        
+        // Send POST request for extraction using the uploaded image path
+        const response = await api.post('/extraction', {
+          imagePath: this.uploadedImagePath,
+          algorithm: this.selectedAlgorithm
+        });
+        
+        // Handle response
+        if (response && response.code === 0 && response.data) {
+          console.log('Extraction completed, results:', response.data);
+          
+          // Update result image
+          this.resultImage = response.data.resultImageUrl || '';
+          
+          // Update statistics
+          this.extractionStats = {
+            buildingsCount: response.data.buildingsCount || 0,
+            totalArea: response.data.totalArea || 0,
+            averageSize: response.data.averageSize || 0
+          };
+          
+          // Show results section
+          this.showResults = true;
+        } else {
+          throw new Error(response?.message || 'Failed to process extraction');
+        }
+      } catch (error) {
+        console.error('Error during extraction:', error);
+        this.errorMessage = error.message || 'An error occurred during extraction. Please try again.';
+      } finally {
+        this.isProcessing = false;
+      }
+    },
+    exportResults() {
+      // Export results functionality
+      console.log('Exporting results');
+      // Implement export functionality here
+    },
+    saveProject() {
+      // Save project functionality
+      console.log('Saving project');
+      // Implement save project functionality here
     }
   }
 }
@@ -194,6 +317,12 @@ h2 {
   transform: translateY(-1px);
 }
 
+.btn:disabled {
+  background-color: #999;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .btn-secondary {
   display: inline-block;
   padding: 12px 28px;
@@ -225,6 +354,28 @@ h2 {
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
+.upload-progress {
+  margin-top: 16px;
+  background-color: #f0f0f0;
+  border-radius: 8px;
+  height: 8px;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-bar {
+  height: 100%;
+  background-color: #000;
+  transition: width 0.3s ease;
+}
+
+.progress-text {
+  display: block;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #666;
+}
+
 .extraction-controls {
   background: white;
   padding: 30px;
@@ -233,7 +384,7 @@ h2 {
 }
 
 .control-group {
-  margin-bottom: 24px;
+  margin-bottom: 30px;
 }
 
 .control-group label {
@@ -244,19 +395,24 @@ h2 {
   font-size: 14px;
 }
 
-input[type="range"], select {
-  width: 100%;
-  margin-bottom: 10px;
-  padding: 10px 0;
-}
-
 select {
-  padding: 10px 12px;
+  width: 100%;
+  padding: 12px;
   border: 1px solid #e8e8e8;
   border-radius: 8px;
   background-color: white;
   font-size: 14px;
   color: #000;
+}
+
+.error-message {
+  margin-top: 20px;
+  padding: 12px;
+  background-color: #fdf3f3;
+  color: #c22f2f;
+  border-radius: 8px;
+  font-size: 14px;
+  border: 1px solid #f2c3c3;
 }
 
 .result-section {

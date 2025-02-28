@@ -50,6 +50,8 @@
 </template>
 
 <script>
+import api from '../services/api.js';
+
 export default {
   name: 'NavBar',
   data() {
@@ -96,15 +98,28 @@ export default {
         this.showUserMenu = false;
       }
     },
+    logout() {
+      api.logout();
+    },
     checkLoginStatus() {
       this.isLoggedIn = localStorage.getItem('isAuthenticated') === 'true';
-      console.log('Login status:', this.isLoggedIn); // 调试信息
+      console.log('Login status checked, isLoggedIn:', this.isLoggedIn);
+      
+      // 如果已登录，尝试获取用户信息
+      if (this.isLoggedIn) {
+        this.getUserInfo();
+      }
     },
-    logout() {
-      localStorage.removeItem('isAuthenticated');
-      this.showUserMenu = false;
-      window.dispatchEvent(new Event('storage'));
-      this.$router.push('/login');
+    async getUserInfo() {
+      try {
+        // 调用获取用户信息的API
+        const response = await api.get('/user/profile');
+        if (response && response.Data && response.Data.username) {
+          this.username = response.Data.username;
+        }
+      } catch (error) {
+        console.error('Failed to get user info:', error);
+      }
     }
   }
 }

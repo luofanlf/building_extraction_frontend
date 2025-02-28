@@ -60,7 +60,14 @@ export default {
       rememberMe: false,
       loading: false,
       error: null,
-      successMessage: null
+      successMessage: null,
+      redirectPath: null
+    }
+  },
+  created() {
+    // 获取查询参数中的重定向路径
+    if (this.$route.query.redirect) {
+      this.redirectPath = this.$route.query.redirect
     }
   },
   methods: {
@@ -70,35 +77,65 @@ export default {
         this.error = null;
         this.successMessage = null;
         
+        console.log('Login attempt with:', { username: this.username, password: '***' });
+        
         // 调用后端API
         const response = await api.post('/login', {
           username: this.username,
           password: this.password
         });
         
-        // 检查响应状态 - 使用code字段
-        if (response.code === 0) {
-          // 登录成功，显示成功消息
-          this.successMessage = 'Login successful. Redirecting...';
+        console.log('Login raw response:', response);
+        
+        // 获取响应数据
+        const apiResponse = response.data;
+        console.log('API Response:', apiResponse);
+        
+        // 检查是否包含token（成功标志）
+        if (apiResponse && apiResponse.token) {
+          // 保存token到localStorage
+          localStorage.setItem('token', apiResponse.token);
+          console.log('Token saved successfully');
           
-          // 登录成功，设置认证状态
+          // 设置认证状态
           localStorage.setItem('isAuthenticated', 'true');
+          
+          // 显示成功消息
+          this.successMessage = apiResponse.message || 'Login successful. Redirecting...';
           
           // 通知其他组件登录状态变化
           window.dispatchEvent(new Event('storage'));
           
           // 延迟跳转，让用户看到成功消息
           setTimeout(() => {
-            // 登录成功后跳转到首页
-            this.$router.push('/home');
+            if (this.redirectPath) {
+              this.$router.push(this.redirectPath);
+            } else {
+              this.$router.push('/home');
+            }
           }, 1000);
         } else {
-          // 如果后端返回的code不是0
-          this.error = response.data.err || 'Login failed';
+          // 如果没有token但有message，可能是业务逻辑错误
+          if (apiResponse && apiResponse.message) {
+            this.error = apiResponse.message;
+          } else {
+            this.error = 'Login failed: Invalid credentials';
+          }
         }
       } catch (err) {
-        this.error = err.response?.data?.message || 'Incorrect username or password. Please try again later.';
-        console.error('Login error:', err);
+        console.error('Login error details:', err);
+        
+        // 提供更详细的错误信息
+        if (err.response) {
+          console.log('Error response:', err.response);
+          this.error = (err.response.data && err.response.data.message) 
+            ? err.response.data.message 
+            : `Login failed: Server returned ${err.response.status}`;
+        } else if (err.request) {
+          this.error = 'Login failed: No response received from server';
+        } else {
+          this.error = 'Error during login: ' + err.message;
+        }
       } finally {
         this.loading = false;
       }
