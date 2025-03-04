@@ -12,14 +12,14 @@
       </div>
       
       <div class="filters">
-        <select v-model="filterStatus">
-          <option value="all">All Statuses</option>
-          <option value="completed">Completed</option>
-          <option value="processing">Processing</option>
-          <option value="failed">Failed</option>
+        <select v-model="selectedModel" class="filter-select">
+          <option value="all">All Models</option>
+          <option v-for="model in availableModels" :key="model" :value="model">
+            {{ model }}
+          </option>
         </select>
         
-        <select v-model="sortBy">
+        <select v-model="sortBy" class="filter-select">
           <option value="date-desc">Newest First</option>
           <option value="date-asc">Oldest First</option>
           <option value="name-asc">Name A-Z</option>
@@ -28,38 +28,36 @@
       </div>
     </div>
     
-    <div class="projects-grid">
-      <div v-for="project in filteredProjects" :key="project.id" class="project-card">
+    <div class="loading-indicator" v-if="isLoading">
+      <div class="spinner"></div>
+      <p>Loading projects...</p>
+    </div>
+    
+    <div class="projects-grid" v-else>
+      <div v-for="project in filteredProjects" :key="project.ID" class="project-card">
         <div class="project-thumbnail">
-          <img :src="project.thumbnail" alt="Project thumbnail" />
-          <div class="project-status" :class="project.status">
-            {{ getStatusText(project.status) }}
-          </div>
+          <img :src="getImageUrl(project.input_image)" alt="Project input image" />
         </div>
         
         <div class="project-info">
           <h3>{{ project.name }}</h3>
-          <p class="project-date">{{ formatDate(project.date) }}</p>
+          <p class="project-date">{{ formatDate(project.created_at) }}</p>
           <div class="project-stats">
             <div class="stat">
-              <span class="stat-value">{{ project.buildingCount }}</span>
-              <span class="stat-label">Buildings</span>
-            </div>
-            <div class="stat">
-              <span class="stat-value">{{ project.area }}</span>
-              <span class="stat-label">m²</span>
+              <span class="stat-value">{{ project.model }}</span>
+              <span class="stat-label">Model</span>
             </div>
           </div>
         </div>
         
         <div class="project-actions">
-          <button class="action-btn view-btn" @click="viewProject(project.id)">View</button>
-          <button class="action-btn export-btn" @click="exportProject(project.id)">Export</button>
-          <button class="action-btn delete-btn" @click="confirmDelete(project.id)">Delete</button>
+          <button class="action-btn view-btn" @click="viewProject(project.ID)">View</button>
+          <button class="action-btn export-btn" @click="exportProject(project.ID)">Export</button>
+          <button class="action-btn delete-btn" @click="confirmDelete(project.ID)">Delete</button>
         </div>
       </div>
       
-      <div v-if="filteredProjects.length === 0" class="no-projects">
+      <div v-if="filteredProjects.length === 0 && !isLoading" class="no-projects">
         <div class="empty-state">
           <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round">
             <rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect>
@@ -87,67 +85,40 @@
 </template>
 
 <script>
+import api from '../services/api.js';
+
 export default {
   name: 'ProjectHistory',
   data() {
     return {
       searchQuery: '',
-      filterStatus: 'all',
       sortBy: 'date-desc',
+      selectedModel: 'all',
       showDeleteModal: false,
       projectToDelete: null,
-      projects: [
-        {
-          id: 1,
-          name: 'Beijing CBD Building Extraction',
-          date: new Date(2023, 6, 15),
-          thumbnail: 'https://images.unsplash.com/photo-1545642419-d0e61a866ab1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8Mnx8c2F0ZWxsaXRlJTIwaW1hZ2V8ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&w=500&q=60',
-          status: 'completed',
-          buildingCount: 128,
-          area: '42,560'
-        },
-        {
-          id: 2,
-          name: 'Shanghai Pudong Analysis',
-          date: new Date(2023, 7, 3),
-          thumbnail: 'https://images.unsplash.com/photo-1614642264762-d0a3b8bf3700?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8M3x8c2F0ZWxsaXRlJTIwaW1hZ2V8ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&w=500&q=60',
-          status: 'processing',
-          buildingCount: 245,
-          area: '78,950'
-        },
-        {
-          id: 3,
-          name: 'Guangzhou Tianhe Building Extraction',
-          date: new Date(2023, 5, 22),
-          thumbnail: 'https://images.unsplash.com/photo-1576719561108-7023141c67e3?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8NXx8c2F0ZWxsaXRlJTIwaW1hZ2V8ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&w=500&q=60',
-          status: 'completed',
-          buildingCount: 187,
-          area: '56,320'
-        },
-        {
-          id: 4,
-          name: 'Shenzhen Nanshan Analysis',
-          date: new Date(2023, 7, 8),
-          thumbnail: 'https://images.unsplash.com/photo-1622542796254-5b9c46a804a8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OHx8c2F0ZWxsaXRlJTIwaW1hZ2V8ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&w=500&q=60',
-          status: 'failed',
-          buildingCount: 0,
-          area: '0'
-        },
-        {
-          id: 5,
-          name: 'Hangzhou West Lake Building Density Analysis',
-          date: new Date(2023, 6, 29),
-          thumbnail: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxzZWFyY2h8OXx8c2F0ZWxsaXRlJTIwaW1hZ2V8ZW58MHx8MHx8fDA%3D&auto=format&fit=crop&w=500&q=60',
-          status: 'completed',
-          buildingCount: 94,
-          area: '31,240'
-        }
-      ]
+      isLoading: true,
+      projects: [],
+      error: null
     }
   },
+  created() {
+    // 组件创建时获取项目数据
+    this.fetchProjects();
+  },
   computed: {
+    // 获取所有可用的模型类型
+    availableModels() {
+      const models = new Set(this.projects.map(project => project.model));
+      return Array.from(models).sort();
+    },
+    
     filteredProjects() {
       let result = [...this.projects]
+      
+      // 应用模型筛选
+      if (this.selectedModel !== 'all') {
+        result = result.filter(project => project.model === this.selectedModel);
+      }
       
       // 应用搜索筛选
       if (this.searchQuery) {
@@ -155,18 +126,13 @@ export default {
         result = result.filter(project => project.name.toLowerCase().includes(query))
       }
       
-      // 应用状态筛选
-      if (this.filterStatus !== 'all') {
-        result = result.filter(project => project.status === this.filterStatus)
-      }
-      
       // 应用排序
       switch(this.sortBy) {
         case 'date-desc':
-          result.sort((a, b) => b.date - a.date)
+          result.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
           break
         case 'date-asc':
-          result.sort((a, b) => a.date - b.date)
+          result.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
           break
         case 'name-asc':
           result.sort((a, b) => a.name.localeCompare(b.name))
@@ -180,42 +146,168 @@ export default {
     }
   },
   methods: {
-    formatDate(date) {
-      return date.toLocaleDateString('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' })
-    },
-    getStatusText(status) {
-      const statusMap = {
-        'completed': '已完成',
-        'processing': '处理中',
-        'failed': '失败'
+    async fetchProjects() {
+      try {
+        this.isLoading = true;
+        this.error = null;
+        
+        // 调用API获取项目列表
+        const response = await api.get('/projects');
+        
+        console.log('Projects response:', response);
+        
+        // 设置项目数据
+        if (response.data && Array.isArray(response.data)) {
+          this.projects = response.data;
+        } else if (response.data && response.data.code === 0 && Array.isArray(response.data.data)) {
+          this.projects = response.data.data;
+        } else {
+          console.error('Unexpected projects response format:', response.data);
+          this.error = 'Failed to load projects due to unexpected response format';
+        }
+      } catch (error) {
+        console.error('Error fetching projects:', error);
+        this.error = 'Failed to load projects. Please try again later.';
+      } finally {
+        this.isLoading = false;
       }
-      return statusMap[status] || status
+    },
+    formatDate(date) {
+      if (!date) return 'N/A';
+      
+      try {
+        // 尝试直接解析
+        let dateObj = new Date(date);
+        
+        // 检查是否为有效日期
+        if (isNaN(dateObj.getTime())) {
+          // 如果无效，尝试手动格式化
+          // 处理格式如 "2025-03-03 03:07:08.060819+00"
+          const parts = date.split(/[- :.+]/);
+          if (parts.length >= 6) {
+            // 按照 YYYY, MM-1, DD, HH, MM, SS 创建日期
+            // 注意月份需要减1，因为JavaScript中月份是从0开始的
+            dateObj = new Date(
+              parseInt(parts[0]), 
+              parseInt(parts[1]) - 1, 
+              parseInt(parts[2]), 
+              parseInt(parts[3]), 
+              parseInt(parts[4]), 
+              parseInt(parts[5])
+            );
+          }
+        }
+        
+        // 如果还是无效日期，返回原始字符串
+        if (isNaN(dateObj.getTime())) {
+          console.warn('Could not parse date:', date);
+          return date;
+        }
+        
+        // 格式化日期
+        return dateObj.toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } catch (error) {
+        console.error('Error formatting date:', error);
+        return date; // 返回原始日期字符串作为后备
+      }
+    },
+    getImageUrl(imagePath) {
+      // 处理图片URL路径
+      if (!imagePath) return '';
+      
+      if (imagePath.startsWith('http')) {
+        return imagePath;
+      }
+      
+      // 添加API基础URL
+      const baseUrl = process.env.VUE_APP_API_URL || 'http://localhost:8080';
+      return imagePath.startsWith('/') ? `${baseUrl}${imagePath}` : `${baseUrl}/${imagePath}`;
     },
     viewProject(id) {
-      console.log('查看项目:', id)
+      console.log('Viewing project:', id);
       // 导航到项目详情页
-      this.$router.push(`/project/${id}`)
+      this.$router.push(`/project/${id}`);
     },
-    exportProject(id) {
-      console.log('导出项目:', id)
-      // 实现项目导出逻辑
+    async exportProject(id) {
+      console.log('Exporting project:', id);
+      try {
+        // 调用导出API
+        const response = await api.get(`/project/${id}/export`);
+        
+        // 检查是否返回了下载URL
+        if (response.data && response.data.downloadUrl) {
+          // 创建隐藏的下载链接并触发点击
+          const downloadLink = document.createElement('a');
+          downloadLink.href = this.getImageUrl(response.data.downloadUrl);
+          downloadLink.download = `project-${id}-export.zip`;
+          document.body.appendChild(downloadLink);
+          downloadLink.click();
+          document.body.removeChild(downloadLink);
+        } else {
+          console.error('No download URL in export response:', response);
+          alert('Export failed: No download URL provided');
+        }
+      } catch (error) {
+        console.error('Error exporting project:', error);
+        alert('Failed to export project. Please try again.');
+      }
     },
     confirmDelete(id) {
-      this.projectToDelete = id
-      this.showDeleteModal = true
+      this.projectToDelete = id;
+      this.showDeleteModal = true;
     },
-    deleteProject() {
-      console.log('删除项目:', this.projectToDelete)
-      // 从项目列表中移除项目
-      this.projects = this.projects.filter(p => p.id !== this.projectToDelete)
-      this.showDeleteModal = false
-      this.projectToDelete = null
+    async deleteProject() {
+      try {
+        // 调用删除API
+        await api.delete(`/project/${this.projectToDelete}`);
+        
+        // 从项目列表中移除项目
+        this.projects = this.projects.filter(p => p.ID !== this.projectToDelete);
+        
+        console.log('Project deleted:', this.projectToDelete);
+        this.showDeleteModal = false;
+        this.projectToDelete = null;
+      } catch (error) {
+        console.error('Error deleting project:', error);
+        alert('Failed to delete project. Please try again.');
+      }
     }
   }
 }
 </script>
 
 <style scoped>
+/* 添加加载指示器样式 */
+.loading-indicator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+}
+
+.spinner {
+  border: 4px solid rgba(0, 0, 0, 0.1);
+  border-radius: 50%;
+  border-top: 4px solid #3498db;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* 保留原始样式 */
 .history-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -306,31 +398,6 @@ h1 {
   width: 100%;
   height: 100%;
   object-fit: cover;
-}
-
-.project-status {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.project-status.completed {
-  background-color: #eef9f2;
-  color: #227855;
-}
-
-.project-status.processing {
-  background-color: #eef4ff;
-  color: #3a5cc9;
-}
-
-.project-status.failed {
-  background-color: #fcf1ee;
-  color: #cc3a2f;
 }
 
 .project-info {
@@ -536,5 +603,15 @@ h1 {
   .projects-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* 添加一个样式来保持下拉框之间的一致性 */
+.filter-select {
+  padding: 10px 16px;
+  border: 1px solid #e8e8e8;
+  border-radius: 8px;
+  background-color: white;
+  font-size: 14px;
+  color: #000;
 }
 </style> 

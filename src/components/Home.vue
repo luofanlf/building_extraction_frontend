@@ -1,7 +1,7 @@
 <template>
   <div class="home-container">
     <div class="home-content">
-      <h1>Welcome to Uncerscape</h1>
+      <h1>Meet Uncerscape</h1>
       
       <div class="dashboard">
         <div class="info-card">
@@ -46,7 +46,7 @@ h1 {
   color: #000;
   margin-bottom: 40px;
   text-align: center;
-  font-size: 2.5rem;
+  font-size: 3.5rem;
   font-weight: 700;
   letter-spacing: -0.5px;
 }

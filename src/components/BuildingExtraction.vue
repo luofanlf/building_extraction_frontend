@@ -21,10 +21,6 @@
       <div class="preview-container">
         <h2>Image Preview</h2>
         <img :src="imagePreview" alt="Preview" class="preview-image" />
-        <div class="upload-progress" v-if="isUploading">
-          <div class="progress-bar" :style="{ width: uploadProgress + '%' }"></div>
-          <span class="progress-text">Uploading... {{ uploadProgress }}%</span>
-        </div>
       </div>
       
       <div class="extraction-controls">
@@ -39,7 +35,7 @@
           </select>
         </div>
         
-        <button class="btn" @click="startExtraction" :disabled="isProcessing || isUploading || !imageUploaded">
+        <button class="btn" @click="startExtraction" :disabled="isProcessing || !originalImage">
           {{ isProcessing ? 'Processing...' : 'Start Extraction' }}
         </button>
         
@@ -85,9 +81,6 @@ export default {
       selectedAlgorithm: 'unet',
       showResults: false,
       isProcessing: false,
-      isUploading: false,
-      uploadProgress: 0,
-      imageUploaded: false,
       errorMessage: null,
       resultImage: '',
       extractionStats: {
@@ -95,8 +88,7 @@ export default {
         totalArea: 0,
         averageSize: 0
       },
-      originalImage: null, // Store original image data
-      uploadedImagePath: '' // Store uploaded image path
+      originalImage: null
     }
   },
   methods: {
@@ -116,126 +108,131 @@ export default {
       }
     },
     processImage(file) {
-      // Validate file type
+      // 验证文件类型
       if (!file.type.match('image.*')) {
         this.errorMessage = 'Please upload an image file';
         return;
       }
       
-      // Validate file size (limit to 20MB)
+      // 验证文件大小 (限制为20MB)
       if (file.size > 20 * 1024 * 1024) {
         this.errorMessage = 'Image size cannot exceed 20MB';
         return;
       }
       
-      // Save original image data
+      // 存储原始图片数据，待发送
       this.originalImage = file;
       
-      // Create preview
+      // 创建预览
       const reader = new FileReader();
       reader.onload = (e) => {
         this.imagePreview = e.target.result;
       }
       reader.readAsDataURL(file);
       
-      // Reset state
+      // 重置状态
       this.errorMessage = null;
-      this.imageUploaded = false;
-      this.uploadedImagePath = '';
-      
-      // Automatically upload image to server
-      this.uploadImage(file);
-    },
-    async uploadImage(file) {
-      try {
-        this.isUploading = true;
-        this.uploadProgress = 0;
-        
-        // Create FormData object
-        const formData = new FormData();
-        formData.append('image', file);
-        
-        // Send POST request to upload image
-        const response = await api.post('/upload', formData, {
-          headers: {
-            'Content-Type': 'multipart/form-data'
-          },
-          onUploadProgress: (progressEvent) => {
-            // Calculate and update upload progress
-            this.uploadProgress = Math.round(
-              (progressEvent.loaded * 100) / progressEvent.total
-            );
-          }
-        });
-        
-        // Handle response
-        if (response && response.code === 0 && response.data) {
-          // Save uploaded image path
-          this.uploadedImagePath = response.data.imagePath;
-          this.imageUploaded = true;
-          console.log('Image uploaded successfully, path:', this.uploadedImagePath);
-        } else {
-          throw new Error(response?.message || 'Failed to upload image');
-        }
-      } catch (error) {
-        console.error('Error uploading image:', error);
-        this.errorMessage = error.message || 'Failed to upload image. Please try again.';
-      } finally {
-        this.isUploading = false;
-      }
+      this.showResults = false;
     },
     async startExtraction() {
-      if (!this.imageUploaded || !this.uploadedImagePath) {
-        this.errorMessage = 'Please upload an image first';
+      if (!this.originalImage) {
+        this.errorMessage = 'Please select an image first';
         return;
       }
       
       try {
+        console.log('开始提取过程...');
         this.isProcessing = true;
         this.errorMessage = null;
         this.showResults = false;
         
-        // Send POST request for extraction using the uploaded image path
-        const response = await api.post('/extraction', {
-          imagePath: this.uploadedImagePath,
-          algorithm: this.selectedAlgorithm
+        // 创建FormData对象
+        const formData = new FormData();
+        formData.append('image', this.originalImage);
+        formData.append('algorithm', this.selectedAlgorithm);
+        
+        console.log('准备发送提取请求，算法:', this.selectedAlgorithm);
+        
+        // 发送请求，一步完成上传和提取
+        const response = await api.post('/extraction', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
         });
         
-        // Handle response
-        if (response && response.code === 0 && response.data) {
-          console.log('Extraction completed, results:', response.data);
+        console.log('原始响应:', response);
+        
+        // 解析返回数据 - 根据响应格式确定正确路径
+        let resultUrl = '';
+        
+        // 检查response.data的类型和内容
+        if (typeof response.data === 'string') {
+          // 直接是字符串URL
+          resultUrl = response.data;
+          console.log('响应是字符串URL:', resultUrl);
+        } else if (response.data && response.data.data) {
+          // 包含在data.data中
+          resultUrl = response.data.data;
+          console.log('响应包含在data.data中:', resultUrl);
+        } else if (response.data && response.data.code === 0) {
+          // 标准响应格式
+          resultUrl = response.data.data;
+          console.log('标准响应格式,URL在data.data中:', resultUrl);
+        } else {
+          console.error('未识别的响应格式:', response.data);
+          throw new Error('Unrecognized response format');
+        }
+        
+        // 设置结果图像URL - 确保URL是完整的
+        if (resultUrl) {
+          // 处理相对URL，确保完整路径
+          if (resultUrl.startsWith('/')) {
+            // 使用后端服务器URL - 直接指定，不使用import.meta.env
+            const backendUrl = process.env.VUE_APP_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:8080';
+            this.resultImage = `${backendUrl}${resultUrl}`;
+            console.log('转换为完整URL:', this.resultImage);
+          } else if (resultUrl.startsWith('http')) {
+            // 已经是完整URL
+            this.resultImage = resultUrl;
+          } else {
+            // 其他情况，添加默认前缀
+            const backendUrl = process.env.VUE_APP_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:8080';
+            this.resultImage = `${backendUrl}/${resultUrl}`;
+          }
           
-          // Update result image
-          this.resultImage = response.data.resultImageUrl || '';
+          console.log('最终设置的结果图像URL:', this.resultImage);
           
-          // Update statistics
+          // 设置统计信息占位符
           this.extractionStats = {
-            buildingsCount: response.data.buildingsCount || 0,
-            totalArea: response.data.totalArea || 0,
-            averageSize: response.data.averageSize || 0
+            buildingsCount: 'N/A',
+            totalArea: 'N/A',
+            averageSize: 'N/A'
           };
           
-          // Show results section
+          // 显示结果区域
           this.showResults = true;
+          console.log('结果区域已显示');
         } else {
-          throw new Error(response?.message || 'Failed to process extraction');
+          throw new Error('No result image URL found in response');
         }
       } catch (error) {
-        console.error('Error during extraction:', error);
+        console.error('提取过程中的错误:', error);
+        console.error('错误详情:', error.stack);
         this.errorMessage = error.message || 'An error occurred during extraction. Please try again.';
       } finally {
         this.isProcessing = false;
+        console.log('提取过程结束');
       }
     },
     exportResults() {
-      // Export results functionality
+      // 导出结果功能
       console.log('Exporting results');
-      // Implement export functionality here
+      // 实现导出功能
     },
     saveProject() {
-      // Save project functionality
+      // 保存项目功能
       console.log('Saving project');
-      // Implement save project functionality here
+      // 实现保存项目功能
     }
   }
 }
@@ -352,28 +349,6 @@ h2 {
   max-width: 100%;
   border-radius: 12px;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-}
-
-.upload-progress {
-  margin-top: 16px;
-  background-color: #f0f0f0;
-  border-radius: 8px;
-  height: 8px;
-  position: relative;
-  overflow: hidden;
-}
-
-.progress-bar {
-  height: 100%;
-  background-color: #000;
-  transition: width 0.3s ease;
-}
-
-.progress-text {
-  display: block;
-  margin-top: 8px;
-  font-size: 14px;
-  color: #666;
 }
 
 .extraction-controls {
