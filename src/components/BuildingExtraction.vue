@@ -98,6 +98,12 @@
         </div>
       </div>
     </div>
+    
+    <!-- 添加一个简单的通知组件 -->
+    <div class="notification" v-if="notification.show" :class="notification.type">
+      {{ notification.message }}
+      <span class="close-notification" @click="closeNotification">&times;</span>
+    </div>
   </div>
 </template>
 
@@ -127,7 +133,14 @@ export default {
       projectName: '',
       isSaving: false,
       inputImagePath: '',
-      outputImagePath: ''
+      outputImagePath: '',
+      // 添加通知相关数据
+      notification: {
+        show: false,
+        message: '',
+        type: 'success', // 'success' 或 'error'
+        timeout: null
+      }
     }
   },
   methods: {
@@ -152,13 +165,13 @@ export default {
       const isTiff = file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff');
       
       if (!validTypes.includes(file.type) && !isTiff) {
-        this.errorMessage = '请上传支持的图片格式 (JPG, PNG, GIF, TIF)';
+        this.errorMessage = 'Please upload supported image formats (JPG, PNG, GIF, TIF)';
         return;
       }
       
       // 验证文件大小 (限制为20MB)
       if (file.size > 20 * 1024 * 1024) {
-        this.errorMessage = '图片大小不能超过20MB';
+        this.errorMessage = 'Image size cannot exceed 20MB';
         return;
       }
       
@@ -322,11 +335,9 @@ export default {
         // 准备要发送的数据，包含input_image和output_image路径
         const projectData = {
           name: this.projectName.trim(),
-          imageUrl: this.resultImage,
-          algorithm: this.selectedAlgorithm,
-          inputImagePath: this.inputImagePath,
-          outputImagePath: this.outputImagePath,
-          extractionStats: this.extractionStats
+          model: this.selectedAlgorithm,
+          input_image: this.inputImagePath,
+          output_image: this.outputImagePath,
         };
         
         console.log('发送保存项目请求:', projectData);
@@ -339,20 +350,39 @@ export default {
         // 关闭对话框
         this.showSaveDialog = false;
         
-        // 显示成功消息
-        this.$emit('show-notification', {
-          type: 'success',
-          message: 'save success'
-        });
+        // 直接显示成功通知（英文）
+        this.showNotification('success', 'Project saved successfully');
         
       } catch (error) {
-        console.error('save failed:', error);
-        this.$emit('show-notification', {
-          type: 'error',
-          message: 'save failed: ' + (error.message || 'unknown error')
-        });
+        console.error('保存项目失败:', error);
+        this.showNotification('error', 'Failed to save project: ' + (error.message || 'Unknown error'));
       } finally {
         this.isSaving = false;
+      }
+    },
+    // 添加显示通知的方法
+    showNotification(type, message) {
+      // 清除之前的定时器
+      if (this.notification.timeout) {
+        clearTimeout(this.notification.timeout);
+      }
+      
+      // 设置通知内容
+      this.notification = {
+        show: true,
+        type: type,
+        message: message,
+        timeout: setTimeout(() => {
+          this.closeNotification();
+        }, 3000) // 3秒后自动关闭
+      };
+    },
+    // 关闭通知的方法
+    closeNotification() {
+      this.notification.show = false;
+      if (this.notification.timeout) {
+        clearTimeout(this.notification.timeout);
+        this.notification.timeout = null;
       }
     }
   }
@@ -647,5 +677,48 @@ select {
   height: 16px;
   border-width: 2px;
   margin-right: 6px;
+}
+
+/* 添加通知样式 */
+.notification {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  padding: 15px 20px;
+  border-radius: 4px;
+  color: white;
+  font-weight: 500;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  animation: slide-in 0.3s ease-out;
+  max-width: 80%;
+}
+
+.notification.success {
+  background-color: #4caf50;
+}
+
+.notification.error {
+  background-color: #f44336;
+}
+
+.close-notification {
+  margin-left: 15px;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: bold;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 </style> 

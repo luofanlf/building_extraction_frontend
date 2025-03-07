@@ -51,7 +51,7 @@
         </div>
         
         <div class="project-actions">
-          <button class="action-btn view-btn" @click="viewProject(project.ID)">View</button>
+          <button class="action-btn view-btn" @click="viewProject(project)">View</button>
           <button class="action-btn export-btn" @click="exportProject(project.ID)">Export</button>
           <button class="action-btn delete-btn" @click="confirmDelete(project.ID)">Delete</button>
         </div>
@@ -229,10 +229,20 @@ export default {
       const baseUrl = process.env.VUE_APP_API_URL || 'http://localhost:8080';
       return imagePath.startsWith('/') ? `${baseUrl}${imagePath}` : `${baseUrl}/${imagePath}`;
     },
-    viewProject(id) {
-      console.log('Viewing project:', id);
-      // 导航到项目详情页
-      this.$router.push(`/project/${id}`);
+    viewProject(project) {
+      console.log('Viewing project:', project);
+      
+      // 尝试不同的ID字段名称（根据后端返回的实际数据结构调整）
+      const projectId = project.id;
+      
+      if (!projectId) {
+        console.error('No project ID found in:', project);
+        alert('Cannot view project: ID not found');
+        return;
+      }
+      
+      console.log('Navigating to project with ID:', projectId);
+      this.$router.push(`/project/${projectId}`);
     },
     async exportProject(id) {
       console.log('Exporting project:', id);
