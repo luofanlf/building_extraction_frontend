@@ -4,7 +4,7 @@
     
     <div class="upload-section">
       <div class="upload-area" @click="triggerFileInput" @dragover.prevent @drop.prevent="handleFileDrop">
-        <input type="file" ref="fileInput" @change="handleFileSelected" accept="image/*" style="display: none" />
+        <input type="file" ref="fileInput" @change="handleFileSelected" accept="image/*,.tif,.tiff" style="display: none" />
         <div class="upload-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -36,7 +36,11 @@
         </div>
         
         <button class="btn" @click="startExtraction" :disabled="isProcessing || !originalImage">
-          {{ isProcessing ? 'Processing...' : 'Start Extraction' }}
+          <span v-if="isProcessing">
+            <span class="loading-spinner"></span>
+            processing ({{ processingTime }}s)
+          </span>
+          <span v-else>start extraction</span>
         </button>
         
         <div class="error-message" v-if="errorMessage">{{ errorMessage }}</div>
@@ -62,9 +66,36 @@
           <p>{{ extractionStats.averageSize || 0 }} m²</p>
         </div>
       </div>
-      <div class="action-buttons">
-        <button class="btn" @click="exportResults">Export Results</button>
-        <button class="btn-secondary" @click="saveProject">Save Project</button>
+      <div class="result-actions">
+        <button class="btn btn-secondary" @click="downloadResult">export result</button>
+        <button class="btn btn-primary" @click="showSaveProjectDialog">save project</button>
+      </div>
+    </div>
+    
+    <!-- 保存项目模态对话框 -->
+    <div class="modal-overlay" v-if="showSaveDialog" @click.self="cancelSaveProject">
+      <div class="modal-content">
+        <h3>save project</h3>
+        <div class="form-group">
+          <label for="projectName">project name</label>
+          <input 
+            type="text" 
+            id="projectName" 
+            v-model="projectName" 
+            placeholder="please enter a name for your project"
+            @keyup.enter="saveProject"
+          />
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="cancelSaveProject">cancel</button>
+          <button class="btn btn-primary" @click="saveProject" :disabled="!projectName.trim()">
+            <span v-if="isSaving">
+              <span class="loading-spinner small"></span>
+              saving...
+            </span>
+            <span v-else>save</span>
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -72,6 +103,7 @@
 
 <script>
 import api from '../services/api.js';
+import Tiff from 'tiff.js';
 
 export default {
   name: 'BuildingExtraction',
@@ -88,7 +120,14 @@ export default {
         totalArea: 0,
         averageSize: 0
       },
-      originalImage: null
+      originalImage: null,
+      processingTimer: null,
+      processingTime: 0,
+      showSaveDialog: false,
+      projectName: '',
+      isSaving: false,
+      inputImagePath: '',
+      outputImagePath: ''
     }
   },
   methods: {
@@ -107,97 +146,118 @@ export default {
         this.processImage(file)
       }
     },
-    processImage(file) {
+    async processImage(file) {
       // 验证文件类型
-      if (!file.type.match('image.*')) {
-        this.errorMessage = 'Please upload an image file';
+      const validTypes = ['image/tiff', 'image/tif', 'image/jpeg', 'image/png', 'image/gif'];
+      const isTiff = file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff');
+      
+      if (!validTypes.includes(file.type) && !isTiff) {
+        this.errorMessage = '请上传支持的图片格式 (JPG, PNG, GIF, TIF)';
         return;
       }
       
       // 验证文件大小 (限制为20MB)
       if (file.size > 20 * 1024 * 1024) {
-        this.errorMessage = 'Image size cannot exceed 20MB';
+        this.errorMessage = '图片大小不能超过20MB';
         return;
       }
       
-      // 存储原始图片数据，待发送
+      // 存储原始图片数据
       this.originalImage = file;
       
-      // 创建预览
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        this.imagePreview = e.target.result;
+      try {
+        // 如果是TIFF格式，需要特殊处理
+        if (isTiff) {
+          const arrayBuffer = await file.arrayBuffer();
+          const tiff = new Tiff({ buffer: arrayBuffer });
+          const canvas = tiff.toCanvas();
+          this.imagePreview = canvas.toDataURL('image/png');
+        } else {
+          // 其他格式使用普通的FileReader
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            this.imagePreview = e.target.result;
+          };
+          reader.readAsDataURL(file);
+        }
+        
+        this.errorMessage = null;
+        this.showResults = false;
+      } catch (error) {
+        console.error('图片处理错误:', error);
+        this.errorMessage = '图片处理失败，请确保文件格式正确';
       }
-      reader.readAsDataURL(file);
-      
-      // 重置状态
-      this.errorMessage = null;
-      this.showResults = false;
     },
     async startExtraction() {
       if (!this.originalImage) {
-        this.errorMessage = 'Please select an image first';
+        this.errorMessage = 'please select image';
         return;
       }
       
       try {
-        console.log('开始提取过程...');
         this.isProcessing = true;
         this.errorMessage = null;
         this.showResults = false;
         
-        // 创建FormData对象
+        // 开始计时
+        this.processingTime = 0;
+        this.processingTimer = setInterval(() => {
+          this.processingTime++;
+        }, 1000);
+        
         const formData = new FormData();
-        formData.append('image', this.originalImage);
+        
+        const isTiff = this.originalImage.name.toLowerCase().endsWith('.tif') || 
+                      this.originalImage.name.toLowerCase().endsWith('.tiff');
+        
+        if (isTiff) {
+          const response = await fetch(this.imagePreview);
+          const blob = await response.blob();
+          formData.append('image', blob, 'converted.png');
+        } else {
+          formData.append('image', this.originalImage);
+        }
+        
         formData.append('algorithm', this.selectedAlgorithm);
         
-        console.log('准备发送提取请求，算法:', this.selectedAlgorithm);
-        
-        // 发送请求，一步完成上传和提取
         const response = await api.post('/extraction', formData, {
           headers: {
             'Content-Type': 'multipart/form-data'
-          }
+          },
+          timeout: 300000, // 5分钟超时
         });
         
-        console.log('原始响应:', response);
+        console.log('服务器响应:', response);
         
-        // 解析返回数据 - 根据响应格式确定正确路径
-        let resultUrl = '';
-        
-        // 检查response.data的类型和内容
-        if (typeof response.data === 'string') {
-          // 直接是字符串URL
-          resultUrl = response.data;
-          console.log('响应是字符串URL:', resultUrl);
-        } else if (response.data && response.data.data) {
-          // 包含在data.data中
-          resultUrl = response.data.data;
-          console.log('响应包含在data.data中:', resultUrl);
-        } else if (response.data && response.data.code === 0) {
-          // 标准响应格式
-          resultUrl = response.data.data;
-          console.log('标准响应格式,URL在data.data中:', resultUrl);
-        } else {
-          console.error('未识别的响应格式:', response.data);
-          throw new Error('Unrecognized response format');
-        }
-        
-        // 设置结果图像URL - 确保URL是完整的
-        if (resultUrl) {
-          // 处理相对URL，确保完整路径
-          if (resultUrl.startsWith('/')) {
-            // 使用后端服务器URL - 直接指定，不使用import.meta.env
-            const backendUrl = process.env.VUE_APP_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:8080';
-            this.resultImage = `${backendUrl}${resultUrl}`;
-            console.log('转换为完整URL:', this.resultImage);
-          } else if (resultUrl.startsWith('http')) {
-            // 已经是完整URL
-            this.resultImage = resultUrl;
+        // 根据明确的后端响应格式获取mask_url和其他图片路径
+        if (response && response.code === 0 && response.data && response.data.mask_url) {
+          let maskUrl = response.data.mask_url;
+          console.log('获取到的mask_url:', maskUrl);
+          
+          // 保存input_image和output_image路径
+          this.inputImagePath = response.data.input_image || '';
+          this.outputImagePath = response.data.output_image || '';
+          console.log('输入图片路径:', this.inputImagePath);
+          console.log('输出图片路径:', this.outputImagePath);
+          
+          // 检查maskUrl是否已经是完整URL
+          if (maskUrl.startsWith('http://') || maskUrl.startsWith('https://')) {
+            this.resultImage = maskUrl;
           } else {
-            // 其他情况，添加默认前缀
-            const backendUrl = process.env.VUE_APP_API_URL || process.env.REACT_APP_API_URL || 'http://localhost:8080';
-            this.resultImage = `${backendUrl}/${resultUrl}`;
+            // 否则构建完整URL
+            const baseUrl = process.env.VUE_APP_API_URL || '';
+            
+            // 移除URL开头的"./"
+            if (maskUrl.startsWith('./')) {
+              maskUrl = maskUrl.substring(2);
+            }
+            
+            // 确保URL以"/"开头
+            if (!maskUrl.startsWith('/')) {
+              maskUrl = '/' + maskUrl;
+            }
+            
+            this.resultImage = baseUrl + maskUrl;
           }
           
           console.log('最终设置的结果图像URL:', this.resultImage);
@@ -212,16 +272,27 @@ export default {
           // 显示结果区域
           this.showResults = true;
           console.log('结果区域已显示');
+          this.errorMessage = null;
         } else {
-          throw new Error('No result image URL found in response');
+          console.error('无法从响应中获取mask_url', JSON.stringify(response));
+          throw new Error('服务器返回的数据格式不正确，无法获取掩码图片URL');
         }
+        
+        console.log('提取过程结束');
       } catch (error) {
         console.error('提取过程中的错误:', error);
-        console.error('错误详情:', error.stack);
-        this.errorMessage = error.message || 'An error occurred during extraction. Please try again.';
+        if (error.code === 'ECONNABORTED') {
+          this.errorMessage = '请求超时，请重试或联系管理员';
+        } else {
+          this.errorMessage = error.message || '处理过程中出错，请重试';
+        }
       } finally {
         this.isProcessing = false;
-        console.log('提取过程结束');
+        // 清除计时器
+        if (this.processingTimer) {
+          clearInterval(this.processingTimer);
+          this.processingTimer = null;
+        }
       }
     },
     exportResults() {
@@ -229,10 +300,60 @@ export default {
       console.log('Exporting results');
       // 实现导出功能
     },
-    saveProject() {
-      // 保存项目功能
-      console.log('Saving project');
-      // 实现保存项目功能
+    showSaveProjectDialog() {
+      this.showSaveDialog = true;
+      this.projectName = ''; // 清空之前的输入
+      // 自动聚焦到输入框
+      setTimeout(() => {
+        document.getElementById('projectName').focus();
+      }, 100);
+    },
+    cancelSaveProject() {
+      this.showSaveDialog = false;
+    },
+    async saveProject() {
+      if (!this.projectName.trim()) {
+        return;
+      }
+      
+      try {
+        this.isSaving = true;
+        
+        // 准备要发送的数据，包含input_image和output_image路径
+        const projectData = {
+          name: this.projectName.trim(),
+          imageUrl: this.resultImage,
+          algorithm: this.selectedAlgorithm,
+          inputImagePath: this.inputImagePath,
+          outputImagePath: this.outputImagePath,
+          extractionStats: this.extractionStats
+        };
+        
+        console.log('发送保存项目请求:', projectData);
+        
+        // 发送请求到后端
+        const response = await api.post('/projects', projectData);
+        
+        console.log('项目保存成功:', response);
+        
+        // 关闭对话框
+        this.showSaveDialog = false;
+        
+        // 显示成功消息
+        this.$emit('show-notification', {
+          type: 'success',
+          message: 'save success'
+        });
+        
+      } catch (error) {
+        console.error('save failed:', error);
+        this.$emit('show-notification', {
+          type: 'error',
+          message: 'save failed: ' + (error.message || 'unknown error')
+        });
+      } finally {
+        this.isSaving = false;
+      }
     }
   }
 }
@@ -278,6 +399,10 @@ h2 {
   transition: border-color 0.2s;
   background-color: white;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .upload-area:hover {
@@ -296,7 +421,9 @@ h2 {
 }
 
 .btn {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 12px 28px;
   background-color: #000;
   color: white;
@@ -307,6 +434,7 @@ h2 {
   cursor: pointer;
   transition: all 0.2s;
   text-decoration: none;
+  min-width: 150px;
 }
 
 .btn:hover {
@@ -315,9 +443,8 @@ h2 {
 }
 
 .btn:disabled {
-  background-color: #999;
+  background-color: #666;
   cursor: not-allowed;
-  transform: none;
 }
 
 .btn-secondary {
@@ -430,22 +557,95 @@ select {
   margin: 0;
 }
 
-.action-buttons {
+.result-actions {
   display: flex;
-  gap: 16px;
+  gap: 12px;
+  margin-top: 20px;
 }
 
-@media (max-width: 768px) {
-  .preview-section {
-    grid-template-columns: 1fr;
-  }
-  
-  .result-stats {
-    grid-template-columns: 1fr;
-  }
-  
-  .action-buttons {
-    flex-direction: column;
-  }
+.btn-primary {
+  background-color: #000;
+  color: white;
+}
+
+.btn-secondary {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+/* 模态对话框样式 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: white;
+  border-radius: 8px;
+  padding: 24px;
+  width: 90%;
+  max-width: 400px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  font-size: 1.5rem;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: spin 1s ease-in-out infinite;
+  vertical-align: middle;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-spinner.small {
+  width: 16px;
+  height: 16px;
+  border-width: 2px;
+  margin-right: 6px;
 }
 </style> 

@@ -3,7 +3,7 @@ import axios from 'axios';
 // 创建axios实例
 const api = axios.create({
   baseURL: '/api', // 这里使用相对路径，会被代理到后端
-  timeout: 10000, // 请求超时时间
+  timeout: 300000, // 请求超时时间
   headers: {
     'Content-Type': 'application/json'
   }
