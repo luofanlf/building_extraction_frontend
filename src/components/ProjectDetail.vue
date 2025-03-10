@@ -50,6 +50,15 @@
           <div class="project-meta">
             <span class="project-date">{{ formatDate(project.created_at) }}</span>
             <span class="project-model">Model: {{ project.model }}</span>
+            
+            <button class="delete-btn" @click="confirmDelete">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+              </svg>
+              Delete Project
+            </button>
           </div>
         </div>
   
@@ -107,6 +116,17 @@
           </div>
         </div>
       </div>
+      
+      <div class="modal-overlay" v-if="showDeleteModal">
+        <div class="modal-content">
+          <h3>Confirm Deletion</h3>
+          <p>Are you sure you want to delete this project? This action cannot be undone.</p>
+          <div class="modal-actions">
+            <button class="cancel-btn" @click="showDeleteModal = false">Cancel</button>
+            <button class="confirm-btn" @click="deleteProject">Delete</button>
+          </div>
+        </div>
+      </div>
     </div>
   </template>
   
@@ -119,7 +139,8 @@
       return {
         isLoading: true,
         project: {},
-        error: null
+        error: null,
+        showDeleteModal: false
       };
     },
     created() {
@@ -182,6 +203,42 @@
       },
       goToProjects() {
         this.$router.push('/projects');
+      },
+      confirmDelete() {
+        this.showDeleteModal = true;
+      },
+      async deleteProject() {
+        try {
+          this.isLoading = true;
+          
+          // 获取项目ID - 优先使用已加载项目对象的ID
+          const projectId = this.project.id || this.project.ID || this.$route.params.id;
+          
+          console.log('Deleting project with ID:', projectId);
+          
+          if (!projectId) {
+            throw new Error('Project ID not found');
+          }
+          
+          // 确保路径与后端API匹配
+          const response = await api.delete(`/projects/${projectId}`);
+          console.log('Delete response:', response);
+          
+          // 关闭模态框
+          this.showDeleteModal = false;
+          
+          // 显示成功消息
+          alert('Project deleted successfully');
+          
+          // 跳转回项目列表页面
+          this.$router.push('/projects');
+        } catch (error) {
+          console.error('Error deleting project:', error);
+          alert('Failed to delete project: ' + error.message);
+          this.showDeleteModal = false;
+        } finally {
+          this.isLoading = false;
+        }
       }
     }
   };
@@ -488,5 +545,90 @@
       width: 100%;
       justify-content: space-between;
     }
+  }
+  
+  .delete-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background-color: #f44336;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    margin-left: auto;
+  }
+  
+  .delete-btn:hover {
+    background-color: #d32f2f;
+  }
+  
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+  
+  .modal-content {
+    background: white;
+    border-radius: 12px;
+    padding: 30px;
+    width: 100%;
+    max-width: 400px;
+  }
+  
+  .modal-content h3 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    color: #000;
+    font-weight: 600;
+  }
+  
+  .modal-content p {
+    margin-bottom: 24px;
+    color: #666;
+  }
+  
+  .modal-actions {
+    display: flex;
+    gap: 16px;
+  }
+  
+  .cancel-btn, .confirm-btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s;
+  }
+  
+  .cancel-btn {
+    background-color: #f5f5f5;
+    color: #000;
+  }
+  
+  .cancel-btn:hover {
+    background-color: #e9e9e9;
+  }
+  
+  .confirm-btn {
+    background-color: #f44336;
+    color: white;
+  }
+  
+  .confirm-btn:hover {
+    background-color: #d32f2f;
   }
   </style>

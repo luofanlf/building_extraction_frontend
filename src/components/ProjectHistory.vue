@@ -53,7 +53,7 @@
         <div class="project-actions">
           <button class="action-btn view-btn" @click="viewProject(project)">View</button>
           <button class="action-btn export-btn" @click="exportProject(project.ID)">Export</button>
-          <button class="action-btn delete-btn" @click="confirmDelete(project.ID)">Delete</button>
+          <button class="action-btn delete-btn" @click="confirmDelete(project)">Delete</button>
         </div>
       </div>
       
@@ -268,19 +268,36 @@ export default {
         alert('Failed to export project. Please try again.');
       }
     },
-    confirmDelete(id) {
-      this.projectToDelete = id;
+    confirmDelete(project) {
+      // 尝试从不同的可能字段名获取ID
+      const projectId = project.id || project.ID || project._id;
+      
+      console.log('Project to delete:', project);
+      console.log('Project ID found:', projectId);
+      
+      if (!projectId) {
+        console.error('Cannot delete: No ID found in project', project);
+        alert('Cannot delete project: ID not found');
+        return;
+      }
+      
+      this.projectToDelete = projectId;
       this.showDeleteModal = true;
     },
     async deleteProject() {
       try {
-        // 调用删除API
-        await api.delete(`/project/${this.projectToDelete}`);
+        console.log('Deleting project with ID:', this.projectToDelete);
         
-        // 从项目列表中移除项目
-        this.projects = this.projects.filter(p => p.ID !== this.projectToDelete);
+        // 调用删除API - 使用正确的URL格式
+        await api.delete(`/projects/${this.projectToDelete}`);
         
-        console.log('Project deleted:', this.projectToDelete);
+        // 从项目列表中移除项目 - 确保使用相同的ID字段名
+        this.projects = this.projects.filter(p => {
+          const pId = p.id || p.ID || p._id;
+          return pId !== this.projectToDelete;
+        });
+        
+        console.log('Project deleted successfully');
         this.showDeleteModal = false;
         this.projectToDelete = null;
       } catch (error) {
