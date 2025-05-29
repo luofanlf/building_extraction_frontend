@@ -294,8 +294,16 @@ export default {
         console.log('提取过程结束');
       } catch (error) {
         console.error('提取过程中的错误:', error);
+        console.error('错误响应数据:', error.response?.data);
+        
         if (error.code === 'ECONNABORTED') {
           this.errorMessage = '请求超时，请重试或联系管理员';
+        } else if (error.response?.data) {
+          // 处理后端返回的错误信息
+          const errorData = error.response.data;
+          console.log('错误数据结构:', errorData);
+          this.errorMessage = errorData.err || '提取失败，请重试';
+          this.showNotification('error', errorData.err || '提取失败，请重试');
         } else {
           this.errorMessage = error.message || '处理过程中出错，请重试';
         }

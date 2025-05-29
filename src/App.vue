@@ -14,6 +14,20 @@ export default {
   name: 'App',
   components: {
     NavBar
+  },
+  data() {
+    return {
+      isAdmin: false
+    }
+  },
+  async created() {
+    try {
+      const response = await fetch('/api/user/profile')
+      const data = await response.json()
+      this.isAdmin = data.code === 0 && data.data && data.data.is_admin
+    } catch (error) {
+      console.error('获取用户信息失败:', error)
+    }
   }
 }
 </script>
@@ -38,9 +52,12 @@ export default {
   --transition-speed: 0.2s;
 }
 
-.content-container{
-  background-color: #f9f9fb;
+.content-container {
+  margin-top: 70px;
+  min-height: calc(100vh - 70px);
+  background-color: var(--light-bg-color);
 }
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
@@ -48,11 +65,6 @@ body {
   color: var(--text-color);
   background-color: var(--background-color);
   line-height: 1.6;
-}
-
-.content-container {
-  margin-top: 70px; /* 与导航栏高度一致 */
-  min-height: calc(100vh - 70px);
 }
 
 h1, h2, h3, h4, h5, h6 {

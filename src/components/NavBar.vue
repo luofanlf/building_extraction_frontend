@@ -14,6 +14,7 @@
           <router-link to="/extract" class="nav-bar-item">Try Uncerscape</router-link>
           <router-link to="/history" class="nav-bar-item">History</router-link>
           <router-link to="/map" class="nav-bar-item">Map</router-link>
+          <router-link v-if="isAdmin" to="/admin" class="nav-bar-item">Admin</router-link>
         </div>
       </div>
       
@@ -60,7 +61,8 @@ export default {
       isMenuActive: false,
       isLoggedIn: false,
       showUserMenu: false,
-      username: 'User'
+      username: 'User',
+      isAdmin: false
     }
   },
   computed: {
@@ -102,24 +104,46 @@ export default {
     logout() {
       api.logout();
     },
-    checkLoginStatus() {
+    async checkLoginStatus() {
       this.isLoggedIn = localStorage.getItem('isAuthenticated') === 'true';
       console.log('Login status checked, isLoggedIn:', this.isLoggedIn);
       
-      // 如果已登录，尝试获取用户信息
+      // 如果已登录，获取用户信息和管理员权限
       if (this.isLoggedIn) {
-        this.getUserInfo();
+        await this.getUserInfo();
+        await this.getAdminPermission();
+      } else {
+        this.isAdmin = false;
+        console.log('User not logged in, isAdmin set to false');
       }
     },
     async getUserInfo() {
       try {
-        // 调用获取用户信息的API
         const response = await api.get('/user/profile');
+        console.log('User info response:', response);
         if (response && response.Data && response.Data.username) {
           this.username = response.Data.username;
         }
       } catch (error) {
         console.error('Failed to get user info:', error);
+      }
+    },
+    async getAdminPermission() {
+      try {
+        const response = await api.get('/user/profile');
+        console.log('Admin permission response:', response);
+        if (response && response.code === 0 && response.data) {
+          this.isAdmin = response.data.is_admin === 1;
+          console.log('isAdmin set to:', this.isAdmin);
+          console.log('is_admin value from response:', response.data.is_admin);
+        } else {
+          console.log('Invalid response format:', response);
+          this.isAdmin = false;
+        }
+      } catch (error) {
+        console.error('获取用户信息失败:', error);
+        this.isAdmin = false;
+        console.log('Error occurred, isAdmin set to false');
       }
     }
   }
