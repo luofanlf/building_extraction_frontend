@@ -220,8 +220,10 @@
             throw new Error('Project ID not found');
           }
           
-          // 确保路径与后端API匹配
-          const response = await api.delete(`/projects/${projectId}`);
+          // 更新API请求URL，确保与后端路由匹配
+          // 原来是: '/projects/${projectId}'
+          // 更新为您后端定义的确切路径
+          const response = await api.delete(`/project/${projectId}`);
           console.log('Delete response:', response);
           
           // 关闭模态框

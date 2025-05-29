@@ -1,0 +1,5 @@
+此文件用于帮助我理解项目结构。
+请检查项目中的以下文件:
+1. package.json - 查看依赖
+2. 主要组件文件
+3. 配置文件如 vite.config.js 或 webpack.config.js 

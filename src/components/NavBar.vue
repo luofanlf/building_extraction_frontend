@@ -13,6 +13,7 @@
           <router-link to="/about" class="nav-bar-item">About</router-link>
           <router-link to="/extract" class="nav-bar-item">Try Uncerscape</router-link>
           <router-link to="/history" class="nav-bar-item">History</router-link>
+          <router-link to="/map" class="nav-bar-item">Map</router-link>
         </div>
       </div>
       

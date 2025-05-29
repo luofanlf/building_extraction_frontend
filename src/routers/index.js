@@ -5,6 +5,8 @@ import Home from '../components/Home.vue'
 import BuildingExtraction from '../components/BuildingExtraction.vue'
 import ProjectHistory from '../components/ProjectHistory.vue'
 import Register from '../components/Register.vue'
+import Profile from '../components/Profile.vue'
+import MapView from '../components/MapView.vue'
 
 const routes = [
   {
@@ -42,6 +44,17 @@ const routes = [
     path: '/register',
     name: 'Register',
     component: Register
+  },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: Profile,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/map',
+    name: 'MapView',
+    component: MapView
   },
   {
     path: '/project/:id',
