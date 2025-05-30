@@ -34,8 +34,19 @@
             <option value="deeplab">DeepLab v3+</option>
           </select>
         </div>
+
+        <!-- 添加剩余次数显示和申请按钮 -->
+        <div class="remaining-count">
+          <div class="count-info">
+            <span class="count-label">Remaining Extractions:</span>
+            <span class="count-value">{{ remainingCount }}</span>
+          </div>
+          <button class="btn btn-secondary" @click="showRequestDialog">
+            Request More
+          </button>
+        </div>
         
-        <button class="btn" @click="startExtraction" :disabled="isProcessing || !originalImage">
+        <button class="btn" @click="startExtraction" :disabled="isProcessing || !originalImage || remainingCount <= 0">
           <span v-if="isProcessing">
             <span class="loading-spinner"></span>
             processing ({{ processingTime }}s)
@@ -104,6 +115,50 @@
       {{ notification.message }}
       <span class="close-notification" @click="closeNotification">&times;</span>
     </div>
+
+    <!-- 添加申请提取次数对话框 -->
+    <div class="modal-overlay" v-if="showRequestForm" @click.self="closeRequestDialog">
+      <div class="modal-content">
+        <h3>Request Extraction Count</h3>
+        <div class="form-group">
+          <label for="requestCount">Number of Extractions:</label>
+          <div class="count-control">
+            <button class="count-btn" @click="decreaseRequestCount">-</button>
+            <input 
+              type="number" 
+              id="requestCount" 
+              v-model="requestCount" 
+              min="1"
+              readonly
+            />
+            <button class="count-btn" @click="increaseRequestCount">+</button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="requestReason">Reason for Request:</label>
+          <textarea 
+            id="requestReason" 
+            v-model="requestReason" 
+            placeholder="Please explain why you need more extractions"
+            rows="4"
+          ></textarea>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" @click="closeRequestDialog">Cancel</button>
+          <button 
+            class="btn btn-primary" 
+            @click="submitRequest" 
+            :disabled="!requestCount || !requestReason.trim() || isSubmitting"
+          >
+            <span v-if="isSubmitting">
+              <span class="loading-spinner small"></span>
+              Submitting...
+            </span>
+            <span v-else>Submit Request</span>
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -140,8 +195,17 @@ export default {
         message: '',
         type: 'success', // 'success' 或 'error'
         timeout: null
-      }
+      },
+      remainingCount: 0,
+      showRequestForm: false,
+      requestCount: 1,
+      requestReason: '',
+      isSubmitting: false,
     }
+  },
+  async created() {
+    // 获取用户剩余次数
+    await this.loadRemainingCount();
   },
   methods: {
     triggerFileInput() {
@@ -286,6 +350,8 @@ export default {
           this.showResults = true;
           console.log('结果区域已显示');
           this.errorMessage = null;
+          // 更新剩余次数
+          await this.loadRemainingCount();
         } else {
           console.error('无法从响应中获取mask_url', JSON.stringify(response));
           throw new Error('服务器返回的数据格式不正确，无法获取掩码图片URL');
@@ -392,7 +458,58 @@ export default {
         clearTimeout(this.notification.timeout);
         this.notification.timeout = null;
       }
-    }
+    },
+    async loadRemainingCount() {
+      try {
+        const response = await api.get('/user/profile');
+        if (response.code === 0 && response.data) {
+          this.remainingCount = response.data.remaining_count || 0;
+        }
+      } catch (error) {
+        console.error('获取剩余次数失败:', error);
+      }
+    },
+    showRequestDialog() {
+      this.showRequestForm = true;
+      this.requestCount = 1;
+      this.requestReason = '';
+    },
+    closeRequestDialog() {
+      this.showRequestForm = false;
+      this.requestCount = 1;
+      this.requestReason = '';
+    },
+    increaseRequestCount() {
+      this.requestCount++;
+    },
+    decreaseRequestCount() {
+      if (this.requestCount > 1) {
+        this.requestCount--;
+      }
+    },
+    async submitRequest() {
+      if (!this.requestCount || !this.requestReason.trim()) return;
+      
+      this.isSubmitting = true;
+      try {
+        const response = await api.post('/requests', {
+          request_count: this.requestCount,
+          reason: this.requestReason.trim()
+        });
+        
+        if (response.code === 0) {
+          this.showNotification('success', '申请已提交，请等待管理员审核');
+          this.closeRequestDialog();
+        } else {
+          this.showNotification('error', response.err || '申请提交失败');
+        }
+      } catch (error) {
+        console.error('提交申请失败:', error);
+        this.showNotification('error', '申请提交失败，请稍后重试');
+      } finally {
+        this.isSubmitting = false;
+      }
+    },
   }
 }
 </script>
@@ -728,5 +845,72 @@ select {
     transform: translateX(0);
     opacity: 1;
   }
+}
+
+.remaining-count {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.count-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.count-label {
+  color: #666;
+  font-weight: 500;
+}
+
+.count-value {
+  font-size: 20px;
+  font-weight: 600;
+  color: #000;
+}
+
+.count-control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.count-btn {
+  width: 36px;
+  height: 36px;
+  border: 1px solid #ddd;
+  background-color: white;
+  border-radius: 4px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.count-btn:hover {
+  background-color: #f0f0f0;
+}
+
+.count-control input {
+  width: 80px;
+  text-align: center;
+  font-size: 16px;
+}
+
+textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 16px;
+  resize: vertical;
+  min-height: 100px;
 }
 </style> 

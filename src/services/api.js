@@ -15,10 +15,14 @@ api.interceptors.request.use(
     const token = localStorage.getItem('token');
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`;
+      console.log('请求头已添加token:', config.headers);
+    } else {
+      console.log('未找到token');
     }
     return config;
   },
   error => {
+    console.error('请求拦截器错误:', error);
     return Promise.reject(error);
   }
 );
@@ -26,12 +30,14 @@ api.interceptors.request.use(
 // 响应拦截器 - 处理常见错误
 api.interceptors.response.use(
   response => {
-    // 直接返回响应数据
+    console.log('API响应:', response);
     return response.data;
   },
   error => {
+    console.error('API错误:', error);
     // 处理401未授权错误
     if (error.response && error.response.status === 401) {
+      console.log('检测到401错误，清除认证信息');
       // 清除token和认证状态
       localStorage.removeItem('token');
       localStorage.removeItem('isAuthenticated');

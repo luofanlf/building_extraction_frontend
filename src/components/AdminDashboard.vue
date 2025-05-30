@@ -8,19 +8,19 @@
       <div class="stats-grid">
         <div class="stat-card">
           <h3>Total Users</h3>
-          <p class="stat-value">{{ stats.totalUsers }}</p>
+          <p class="stat-value">{{ stats.total_users }}</p>
         </div>
         <div class="stat-card">
           <h3>Total Extractions</h3>
-          <p class="stat-value">{{ stats.totalExtractions }}</p>
+          <p class="stat-value">{{ stats.total_extractions }}</p>
         </div>
         <div class="stat-card">
           <h3>Active Users Today</h3>
-          <p class="stat-value">{{ stats.activeUsersToday }}</p>
+          <p class="stat-value">{{ stats.active_users_today }}</p>
         </div>
         <div class="stat-card">
           <h3>Extractions Today</h3>
-          <p class="stat-value">{{ stats.extractionsToday }}</p>
+          <p class="stat-value">{{ stats.extractions_today }}</p>
         </div>
       </div>
     </div>
@@ -36,15 +36,19 @@
           <div class="request-info">
             <div class="user-info">
               <span class="username">{{ request.username }}</span>
-              <span class="email">{{ request.email }}</span>
+              <span class="user-id">(ID: {{ request.user_id }})</span>
             </div>
             <div class="request-details">
-              <p class="count">Requesting {{ request.count }} extractions</p>
-              <p class="reason">{{ request.reason }}</p>
+              <p class="count">Requesting {{ request.request_count }} extractions</p>
+              <p class="reason">Reason: {{ request.reason }}</p>
               <p class="time">Requested at: {{ formatDate(request.created_at) }}</p>
+              <p class="status" :class="getStatusClass(request.status)">
+                Status: {{ getStatusText(request.status) }}
+              </p>
+              <p v-if="request.reply" class="reply">Reply: {{ request.reply }}</p>
             </div>
           </div>
-          <div class="request-actions">
+          <div class="request-actions" v-if="request.status === 0">
             <button 
               class="btn btn-success" 
               @click="handleRequest(request.id, true)"
@@ -74,16 +78,30 @@
     
     <!-- 用户列表 -->
     <div class="users-section">
-      <h2>User Management</h2>
+      <h2>User Information</h2>
       <div class="users-list">
         <div class="user-item" v-for="user in users" :key="user.id">
           <div class="user-info">
-            <span class="username">{{ user.username }}</span>
-            <span class="email">{{ user.email }}</span>
+            <div class="user-header">
+              <span class="username">{{ user.username }}</span>
+              <span class="user-id">(ID: {{ user.id }})</span>
+              <span class="user-role" :class="getRoleClass(user.user_role)">
+                {{ getRoleText(user.user_role) }}
+              </span>
+            </div>
+            <div class="user-details">
+              <p class="join-time">Joined at: {{ formatDate(user.created_at) }}</p>
+            </div>
           </div>
           <div class="user-stats">
-            <span class="stat">Total Extractions: {{ user.total_extractions }}</span>
-            <span class="stat">Remaining: {{ user.remaining_count }}</span>
+            <div class="stat-item">
+              <span class="stat-label">Total Extractions</span>
+              <span class="stat-value">{{ user.extraction_count }}</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">Remaining</span>
+              <span class="stat-value">{{ user.remaining_count }}</span>
+            </div>
           </div>
           <div class="user-actions">
             <button class="btn btn-secondary" @click="showAddCountDialog(user)">
@@ -95,7 +113,7 @@
     </div>
     
     <!-- 添加提取次数对话框 -->
-    <div class="modal-overlay" v-if="showAddCountDialog" @click.self="closeAddCountDialog">
+    <div class="modal-overlay" v-if="isAddCountDialogVisible" @click.self="closeAddCountDialog">
       <div class="modal-content">
         <h3>Add Extraction Count</h3>
         <div class="form-group">
@@ -135,14 +153,14 @@ export default {
   data() {
     return {
       stats: {
-        totalUsers: 0,
-        totalExtractions: 0,
-        activeUsersToday: 0,
-        extractionsToday: 0
+        total_users: 0,
+        total_extractions: 0,
+        active_users_today: 0,
+        extractions_today: 0
       },
       requests: [],
       users: [],
-      showAddCountDialog: false,
+      isAddCountDialogVisible: false,
       selectedUser: null,
       addCount: '',
       isProcessing: false
@@ -156,27 +174,58 @@ export default {
       try {
         // 获取统计数据
         const statsResponse = await api.get('/admin/stats');
+        console.log('统计数据响应:', statsResponse);
         if (statsResponse.code === 0) {
           this.stats = statsResponse.data;
         }
         
         // 获取申请列表
         const requestsResponse = await api.get('/admin/requests');
+        console.log('申请列表响应:', requestsResponse);
         if (requestsResponse.code === 0) {
           this.requests = requestsResponse.data;
         }
         
         // 获取用户列表
         const usersResponse = await api.get('/admin/users');
+        console.log('用户列表响应:', usersResponse);
         if (usersResponse.code === 0) {
           this.users = usersResponse.data;
         }
       } catch (error) {
         console.error('加载数据失败:', error);
+        if (error.response) {
+          console.error('错误响应:', error.response.data);
+          console.error('错误状态:', error.response.status);
+        }
       }
     },
     formatDate(date) {
       return new Date(date).toLocaleString();
+    },
+    getStatusText(status) {
+      switch (status) {
+        case 0:
+          return 'Pending';
+        case 1:
+          return 'Approved';
+        case 2:
+          return 'Rejected';
+        default:
+          return 'Unknown';
+      }
+    },
+    getStatusClass(status) {
+      switch (status) {
+        case 0:
+          return 'status-pending';
+        case 1:
+          return 'status-approved';
+        case 2:
+          return 'status-rejected';
+        default:
+          return '';
+      }
     },
     async handleRequest(requestId, approved) {
       const request = this.requests.find(r => r.id === requestId);
@@ -184,13 +233,16 @@ export default {
       
       request.processing = true;
       try {
-        const response = await api.post(`/admin/requests/${requestId}`, {
-          approved: approved
+        const response = await api.post('/admin/requests/handle', {
+          request_id: requestId,
+          status: approved ? 1 : 2,
+          reply: approved ? '申请已批准' : '申请已拒绝'
         });
         
         if (response.code === 0) {
-          // 从列表中移除已处理的请求
-          this.requests = this.requests.filter(r => r.id !== requestId);
+          // 更新请求状态
+          request.status = approved ? 1 : 2;
+          request.reply = response.data?.reply || (approved ? '申请已批准' : '申请已拒绝');
           // 重新加载用户列表以更新数据
           await this.loadDashboardData();
         }
@@ -203,10 +255,10 @@ export default {
     showAddCountDialog(user) {
       this.selectedUser = user;
       this.addCount = '';
-      this.showAddCountDialog = true;
+      this.isAddCountDialogVisible = true;
     },
     closeAddCountDialog() {
-      this.showAddCountDialog = false;
+      this.isAddCountDialogVisible = false;
       this.selectedUser = null;
       this.addCount = '';
     },
@@ -227,6 +279,26 @@ export default {
         console.error('添加次数失败:', error);
       } finally {
         this.isProcessing = false;
+      }
+    },
+    getRoleText(role) {
+      switch (role) {
+        case 0:
+          return 'Normal User';
+        case 1:
+          return 'Admin';
+        default:
+          return 'Unknown';
+      }
+    },
+    getRoleClass(role) {
+      switch (role) {
+        case 0:
+          return 'role-normal';
+        case 1:
+          return 'role-admin';
+        default:
+          return '';
       }
     }
   }
@@ -327,8 +399,10 @@ h2 {
   margin-right: 10px;
 }
 
-.email {
+.user-id {
   color: #666;
+  font-size: 14px;
+  margin-left: 8px;
 }
 
 .request-details {
@@ -354,13 +428,60 @@ h2 {
   align-items: center;
 }
 
+.user-info {
+  flex: 1;
+}
+
+.user-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.user-role {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+.role-normal {
+  background-color: #e5e7eb;
+  color: #374151;
+}
+
+.role-admin {
+  background-color: #dbeafe;
+  color: #1e40af;
+}
+
+.user-details {
+  color: #666;
+  font-size: 14px;
+}
+
 .user-stats {
   display: flex;
   gap: 20px;
 }
 
-.stat {
+.stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
   color: #666;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 600;
+  color: #000;
 }
 
 .btn {
@@ -454,5 +575,31 @@ h2 {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.status {
+  font-weight: 500;
+  margin: 8px 0;
+}
+
+.status-pending {
+  color: #f59e0b;
+}
+
+.status-approved {
+  color: #10b981;
+}
+
+.status-rejected {
+  color: #ef4444;
+}
+
+.reply {
+  color: #666;
+  font-style: italic;
+  margin-top: 8px;
+  padding: 8px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
 }
 </style> 
